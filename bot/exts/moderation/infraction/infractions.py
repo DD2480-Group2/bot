@@ -519,6 +519,34 @@ class Infractions(InfractionScheduler, commands.Cog):
         return infraction
 
     @respect_role_hierarchy(member_arg=2)
+    async def apply_voice_ban(
+            self,
+            ctx: Context,
+            user: Member,
+            reason: str | None,
+            **kwargs
+    ) -> None:
+        """Apply a voice ban infraction with kwargs passed to `post_infraction`."""
+        if user.top_role >= ctx.me.top_role:
+            await ctx.send(":x: I can't voice ban users above or equal to me in the role hierarchy.")
+            return
+
+        if await _utils.get_active_infraction(ctx, user, "voice_ban"):
+            return
+
+        infraction = await _utils.post_infraction(ctx, user, "voice_ban", reason, active=True, **kwargs)
+        if infraction is None:
+            return
+
+        role = ctx.guild.get_role(constants.Roles.voice_banned)
+        async def action() -> None:
+            if user.voice and user.voice.channel:
+                await user.move_to(None, reason="Disconnected from voice to apply voice ban.")
+            await user.add_roles(role, reason=reason)
+
+        await self.apply_infraction(ctx, infraction, user, action)
+
+    @respect_role_hierarchy(member_arg=2)
     async def apply_voice_mute(self, ctx: Context, user: MemberOrUser, reason: str | None, **kwargs) -> None:
         """Apply a voice mute infraction with kwargs passed to `post_infraction`."""
         if await _utils.get_active_infraction(ctx, user, "voice_mute"):
