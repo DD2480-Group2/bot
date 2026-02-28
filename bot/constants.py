@@ -145,6 +145,7 @@ class _Roles(EnvConfig, env_prefix="roles_"):
     contributors: int = 295488872404484098
     python_community: int = 458226413825294336
     voice_verified: int = 764802720779337729
+    voice_banned: int = 1477283163733753872
 
     # Streaming
     video: int = 764245844798079016
