@@ -366,13 +366,15 @@ class Infractions(InfractionScheduler, commands.Cog):
         await self.pardon_infraction(ctx, "ban", user, pardon_reason)
 
     @command(aliases=("uvban",))
-    async def unvoiceban(self, ctx: Context) -> None:
-        """
-        NOT IMPLEMENTED.
-
-        Temporarily voice bans that user for the given duration.
-        """
-        await ctx.send(":x: This command is not yet implemented. Maybe you meant to use `unvoicemute`?")
+    async def unvoiceban(
+            self,
+            ctx: Context,
+            user: UnambiguousMemberOrUser,
+            *,
+            pardon_reason: str | None = None
+    ) -> None:
+        """Prematurely end the active voice ban infraction for the user."""
+        await self.pardon_infraction(ctx, "voice_ban", user, pardon_reason)
 
     @command(aliases=("uvmute",))
     async def unvoicemute(
