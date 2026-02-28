@@ -160,15 +160,22 @@ class Infractions(InfractionScheduler, commands.Cog):
         await self.cleanban(ctx, user, duration=(arrow.utcnow() + COMP_BAN_DURATION).datetime, reason=COMP_BAN_REASON)
 
     @command(aliases=("vban",))
-    async def voiceban(self, ctx: Context) -> None:
+    @ensure_future_timestamp(timestamp_arg=3)
+    async def voiceban(
+            self,
+            ctx: Context,
+            user: UnambiguousMemberOrUser,
+            duration: DurationOrExpiry | None = None,
+            *,
+            reason: str | None = None
+    ) -> None:
         """
-        NOT IMPLEMENTED.
-
-        Permanently ban a user from joining voice channels.
+        Ban a user from entering any voice channel.
 
         If duration is specified, it temporarily voice bans that user for the given duration.
         """
-        await ctx.send(":x: This command is not yet implemented. Maybe you meant to use `voicemute`?")
+        await self.apply_voice_ban(ctx, user, reason, duration_or_expiry=duration)
+
 
     @command(aliases=("vmute",))
     @ensure_future_timestamp(timestamp_arg=3)
