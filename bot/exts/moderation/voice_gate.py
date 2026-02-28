@@ -5,7 +5,6 @@ import discord
 from async_rediscache import RedisCache
 from discord import Colour, Member, TextChannel, VoiceState
 from discord.ext.commands import Cog, Context, command, has_any_role
-from pydis_core.site_api import ResponseCodeError
 from pydis_core.utils.channel import get_or_fetch_channel
 
 from bot.bot import Bot
@@ -60,34 +59,18 @@ class VoiceVerificationView(discord.ui.View):
             )
             return
 
-        try:
-            data = await self.bot.api_client.get(
-                f"bot/users/{interaction.user.id}/metricity_data",
-                raise_for_status=True
+        if interaction.user.get_role(Roles.voice_banned):
+            await interaction.response.send_message(
+                "You are currently voice banned and cannot be voice verified.",
+                ephemeral=True,
+                delete_after=GateConf.delete_after_delay,
             )
-        except ResponseCodeError as err:
-            if err.response.status == 404:
-                await interaction.response.send_message((
-                    "We were unable to find user data for you. "
-                    "Please try again shortly. "
-                    "If this problem persists, please contact the server staff through ModMail."),
-                    ephemeral=True,
-                    delete_after=GateConf.delete_after_delay,
-                )
-                log.info("Unable to find Metricity data about %s (%s)", interaction.user, interaction.user.id)
-            else:
-                await interaction.response.send_message((
-                    "We encountered an error while attempting to find data for your user. "
-                    "Please try again and let us know if the problem persists."),
-                    ephemeral=True,
-                    delete_after=GateConf.delete_after_delay,
-                )
-                log.warning(
-                    "Got response code %s while trying to get %s Metricity data.",
-                    err.status,
-                    interaction.user.id
-                )
             return
+
+        data = {
+            "voice_gate_blocked": False,
+            "activity_blocks": GateConf.minimum_activity_blocks
+        }
 
         checks = {
             "joined_at": (
