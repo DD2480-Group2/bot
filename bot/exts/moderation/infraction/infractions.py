@@ -655,39 +655,6 @@ class Infractions(InfractionScheduler, commands.Cog):
 
         return log_text
 
-    async def pardon_voice_ban(
-            self,
-            user_id: int,
-            guild: discord.Guild,
-            reason: str | None,
-            *,
-            notify: bool = True
-    ) -> dict[str, str]:
-        """Remove a user's voice ban, optionally DM them a notification, and return a log dict."""
-        user = await get_or_fetch_member(guild, user_id)
-        log_text = {}
-
-        role = guild.get_role(constants.Roles.voice_banned)
-        if user:
-            new_reason = reason or "Voice ban expired"
-            await user.remove_roles(role, reason=new_reason)
-
-            if notify:
-                # DM the user about the expiration.
-                notified = await _utils.notify_pardon(
-                    user=user,
-                    title="Your voice ban has ended",
-                    content="You may now join VC if you are voice-verified.",
-                    icon_url=_utils.INFRACTION_ICONS["voice_ban"][1]
-                )
-                log_text["DM"] = "Sent" if notified else "**Failed**"
-
-            log_text["Member"] = format_user(user)
-        else:
-            log.info(f"Failed to remove voice ban from user {user_id}: user not found")
-            log_text["Failure"] = "User was not found in the guild."
-        return log_text
-
     async def _pardon_action(self, infraction: _utils.Infraction, notify: bool) -> dict[str, str] | None:
         """
         Execute deactivation steps specific to the infraction's type and return a log dict.
@@ -705,8 +672,6 @@ class Infractions(InfractionScheduler, commands.Cog):
             return await self.pardon_ban(user_id, guild, reason)
         if infraction["type"] == "voice_mute":
             return await self.pardon_voice_mute(user_id, guild, notify=notify)
-        if infraction["type"] == "voice_ban":
-            return await self.pardon_voice_ban(user_id, guild, notify=notify)
         return None
 
     # endregion
