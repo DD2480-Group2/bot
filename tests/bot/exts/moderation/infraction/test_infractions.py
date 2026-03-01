@@ -81,7 +81,7 @@ class TruncationTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(post_infraction_mock.call_args.args[3], infraction_reason)
 
 
-@patch("bot.exts.moderation.infraction.infractions.constants.Roles.voice_verified", new=123456)
+@patch("bot.exts.moderation.infraction.infractions.constants.Roles.voice_banned", new=123456)
 class VoiceBanTests(unittest.IsolatedAsyncioTestCase):
     """Tests for voice ban related functions and commands."""
 
