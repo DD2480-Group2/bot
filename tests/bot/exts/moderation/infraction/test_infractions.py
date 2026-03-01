@@ -87,7 +87,7 @@ class VoiceBanTests(unittest.IsolatedAsyncioTestCase):
 
     def setUp(self):
         self.bot = MockBot()
-        self.mod = MockMember(roles=[MockRole(id=7890123, position=10)])
+        self.mod = MockMember(roles=[MockRole(id=7890123, position=100)])
         self.user = MockMember(roles=[MockRole(id=123456, position=1)])
         self.guild = MockGuild()
         self.ctx = MockContext(bot=self.bot, author=self.mod)
@@ -179,6 +179,213 @@ class VoiceBanTests(unittest.IsolatedAsyncioTestCase):
             "DM": "**Failed**"
         })
         notify_pardon_mock.assert_awaited_once()
+
+    @patch("bot.exts.moderation.infraction.infractions._utils.post_infraction")
+    @patch("bot.exts.moderation.infraction.infractions._utils.get_active_infraction")
+    async def test_voice_ban_blocks_if_user_equal_me(self, get_active_infraction, post_infraction_mock):
+        """Should send error and return early if user is equal to ctx.me in role hierarchy."""
+        get_active_infraction.return_value = None
+        post_infraction_mock.return_value = {"foo": "bar"}
+
+        self.ctx.send = AsyncMock()
+        self.cog.apply_infraction = AsyncMock()
+
+
+        self.ctx.author = self.mod
+        self.mod.roles = [MockRole(id=91212399, position=100)]
+        self.mod.top_role = self.mod.roles[0]
+
+        self.user.roles = [MockRole(id=11212311, position=10)]
+        self.user.top_role = self.user.roles[0]
+
+        self.ctx.me.roles = [MockRole(id=24221322, position=10)]
+        self.ctx.me.top_role = self.ctx.me.roles[0]
+
+
+        self.assertGreaterEqual(self.user.top_role.position, self.ctx.me.top_role.position)
+
+        await self.cog.apply_voice_ban(self.ctx, self.user, "foobar")
+
+        self.ctx.send.assert_awaited_once_with(
+            ":x: I can't voice ban users above or equal to me in the role hierarchy."
+        )
+        self.cog.apply_infraction.assert_not_awaited()
+
+
+    @patch("bot.exts.moderation.infraction.infractions._utils.post_infraction")
+    @patch("bot.exts.moderation.infraction.infractions._utils.get_active_infraction")
+    async def test_voice_ban_blocks_if_user_above_me(self, get_active_infraction, post_infraction_mock):
+        """Should send error and return early if user is above ctx.me in role hierarchy."""
+        get_active_infraction.return_value = None
+        post_infraction_mock.return_value = {"foo": "bar"}
+
+        self.ctx.send = AsyncMock()
+        self.cog.apply_infraction = AsyncMock()
+
+        self.ctx.author = self.mod
+        self.mod.roles = [MockRole(id=912399, position=100)]
+        self.mod.top_role = self.mod.roles[0]
+
+        self.user.roles = [MockRole(id=112311, position=10)]
+        self.user.top_role = self.user.roles[0]
+
+        self.ctx.me.roles = [MockRole(id=2421322, position=9)]
+        self.ctx.me.top_role = self.ctx.me.roles[0]
+
+        self.assertGreaterEqual(self.user.top_role.position, self.ctx.me.top_role.position)
+
+        await self.cog.apply_voice_ban(self.ctx, self.user, "foobar")
+
+        self.ctx.send.assert_awaited_once_with(
+            ":x: I can't voice ban users above or equal to me in the role hierarchy."
+        )
+        self.cog.apply_infraction.assert_not_awaited()
+
+    @patch("bot.exts.moderation.infraction.infractions._utils.post_infraction")
+    @patch("bot.exts.moderation.infraction.infractions._utils.get_active_infraction")
+    async def test_voice_ban_allows_if_user_below_me(self, get_active_infraction, post_infraction_mock):
+        """Should NOT send an error and should proceed if the target is below ctx.me in the role hierarchy."""
+        get_active_infraction.return_value = None
+        post_infraction_mock.return_value = {"foo": "bar"}
+
+        self.ctx.send = AsyncMock()
+        self.cog.apply_infraction = AsyncMock()
+
+        self.ctx.author = self.mod
+        self.mod.roles = [MockRole(id=912399, position=100)]
+        self.mod.top_role = self.mod.roles[0]
+
+        self.user.roles = [MockRole(id=112311, position=10)]
+        self.user.top_role = self.user.roles[0]
+
+        self.ctx.me.roles = [MockRole(id=2421322, position=11)]
+        self.ctx.me.top_role = self.ctx.me.roles[0]
+
+        self.assertLess(self.user.top_role.position, self.ctx.me.top_role.position)
+
+        result = await self.cog.apply_voice_ban(self.ctx, self.user, "foobar")
+        self.assertIsNone(result)
+
+        self.ctx.send.assert_not_awaited()
+
+        post_infraction_mock.assert_awaited_once()
+        self.cog.apply_infraction.assert_awaited_once_with(self.ctx, {"foo": "bar"}, self.user, ANY)
+
+    @patch("bot.exts.moderation.infraction.infractions._utils.post_infraction")
+    @patch("bot.exts.moderation.infraction.infractions._utils.get_active_infraction")
+    async def test_apply_infraction_when_no_previous_infraction_and_reason_is_given(
+        self,
+        get_active_infraction,
+        post_infraction_mock,
+    ):
+        """Should successfully call apply_infraction with the
+        expected reason when no previous infraction has taken place"""
+        self.cog.apply_infraction = AsyncMock()
+
+        get_active_infraction.return_value = None
+        post_infraction_mock.return_value = {"foo": "bar"}
+        reason = "foobar"
+
+        self.ctx.author = self.mod
+        self.mod.roles = [MockRole(id=912399, position=100)]
+        self.mod.top_role = self.mod.roles[0]
+
+        self.user.roles = [MockRole(id=112311, position=10)]
+        self.user.top_role = self.user.roles[0]
+
+        self.ctx.me.roles = [MockRole(id=2421322, position=11)]
+        self.ctx.me.top_role = self.ctx.me.roles[0]
+
+        self.assertIsNone(await self.cog.apply_voice_ban(self.ctx, self.user, reason))
+        self.cog.apply_infraction.assert_awaited_once_with(self.ctx, {"foo": "bar"}, self.user, ANY)
+
+    @patch("bot.exts.moderation.infraction.infractions._utils.post_infraction")
+    @patch("bot.exts.moderation.infraction.infractions._utils.get_active_infraction")
+    async def test_voice_ban_action_disconnects_and_adds_role(self, get_active_infraction, post_infraction_mock):
+        get_active_infraction.return_value = None
+        post_infraction_mock.return_value = {"foo": "bar"}
+
+        self.ctx.send = AsyncMock()
+
+        self.ctx.guild = self.guild
+        role = MockRole(id=123456, position=1)
+        self.guild.get_role = Mock(return_value=role)
+
+        self.ctx.author = self.mod
+
+        self.user.roles = [MockRole(id=112311, position=10)]
+        self.user.top_role = self.user.roles[0]
+
+        self.ctx.me.roles = [MockRole(id=2421322, position=11)]
+        self.ctx.me.top_role = self.ctx.me.roles[0]
+
+        self.user.voice = MagicMock()
+        self.user.voice.channel = MagicMock()
+
+        self.user.move_to = AsyncMock()
+        self.user.add_roles = AsyncMock()
+
+        self.cog.apply_infraction = AsyncMock()
+
+        reason = "foobar"
+        await self.cog.apply_voice_ban(self.ctx, self.user, reason)
+
+        self.cog.apply_infraction.assert_awaited_once_with(self.ctx, {"foo": "bar"}, self.user, ANY)
+
+        action = self.cog.apply_infraction.call_args[0][-1]
+        self.assertTrue(inspect.iscoroutinefunction(action))
+
+        await action()
+
+        self.user.move_to.assert_awaited_once_with(
+            None,
+            reason="Disconnected from voice to apply voice ban."
+        )
+        self.user.add_roles.assert_awaited_once_with(role, reason=reason)
+
+    @patch("bot.exts.moderation.infraction.infractions._utils.post_infraction")
+    @patch("bot.exts.moderation.infraction.infractions._utils.get_active_infraction")
+    async def test_voice_ban_action_does_not_disconnect_but_adds_role(
+        self,
+        get_active_infraction,
+        post_infraction_mock,
+    ):
+        get_active_infraction.return_value = None
+        post_infraction_mock.return_value = {"foo": "bar"}
+
+        self.ctx.send = AsyncMock()
+
+        self.ctx.guild = self.guild
+        role = MockRole(id=123456, position=1)
+        self.guild.get_role = Mock(return_value=role)
+
+        self.ctx.author = self.mod
+
+        self.user.roles = [MockRole(id=112311, position=10)]
+        self.user.top_role = self.user.roles[0]
+
+        self.ctx.me.roles = [MockRole(id=2421322, position=11)]
+        self.ctx.me.top_role = self.ctx.me.roles[0]
+
+        self.user.voice = None
+
+        self.user.move_to = AsyncMock()
+        self.user.add_roles = AsyncMock()
+
+        self.cog.apply_infraction = AsyncMock()
+
+        reason = "foobar"
+        await self.cog.apply_voice_ban(self.ctx, self.user, reason)
+
+        self.cog.apply_infraction.assert_awaited_once_with(self.ctx, {"foo": "bar"}, self.user, ANY)
+
+        action = self.cog.apply_infraction.call_args[0][-1]
+        self.assertTrue(inspect.iscoroutinefunction(action))
+
+        await action()
+
+        self.user.move_to.assert_not_awaited()
+        self.user.add_roles.assert_awaited_once_with(role, reason=reason)
 
 
 @patch("bot.exts.moderation.infraction.infractions.constants.Roles.voice_verified", new=123456)
