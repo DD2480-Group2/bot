@@ -672,6 +672,8 @@ class Infractions(InfractionScheduler, commands.Cog):
             return await self.pardon_ban(user_id, guild, reason)
         if infraction["type"] == "voice_mute":
             return await self.pardon_voice_mute(user_id, guild, notify=notify)
+        if infraction["type"] == "voice_ban":
+            return await self.pardon_voice_ban(user_id, guild, reason, notify=notify)
         return None
 
     # endregion
