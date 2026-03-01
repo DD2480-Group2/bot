@@ -529,15 +529,15 @@ class Infractions(InfractionScheduler, commands.Cog):
             **kwargs
     ) -> None:
         """Apply a voice ban infraction with kwargs passed to `post_infraction`."""
-        if user.top_role >= ctx.me.top_role:
-            await ctx.send(":x: I can't voice ban users above or equal to me in the role hierarchy.")
-            return
-
         if await _utils.get_active_infraction(ctx, user, "voice_ban"):
             return
 
         infraction = await _utils.post_infraction(ctx, user, "voice_ban", reason, active=True, **kwargs)
         if infraction is None:
+            return
+
+        if user.top_role >= ctx.me.top_role:
+            await ctx.send(":x: I can't voice ban users above or equal to me in the role hierarchy.")
             return
 
         role = ctx.guild.get_role(constants.Roles.voice_banned)
