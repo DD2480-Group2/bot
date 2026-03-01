@@ -7,6 +7,7 @@ from discord import Colour, Member, TextChannel, VoiceState
 from discord.ext.commands import Cog, Context, command, has_any_role
 from pydis_core.utils.channel import get_or_fetch_channel
 
+from bot import constants
 from bot.bot import Bot
 from bot.constants import Channels, Icons, MODERATION_ROLES, Roles, VoiceGate as GateConf
 from bot.log import get_logger
@@ -161,6 +162,25 @@ class VoiceGate(Cog):
     async def cog_load(self) -> None:
         """Adds verify button to be monitored by the bot."""
         self.bot.add_view(VoiceVerificationView(self.bot))
+        self.bot.loop.create_task(self.setup_voice_permissions())
+
+    async def setup_voice_permissions(self) -> None:
+        """Loops through all channels and limit role voice_ban to join any chanel."""
+        await self.bot.wait_until_ready()
+
+        guild = self.bot.get_guild(constants.Guild.id)
+        if guild is None:
+            return
+
+        role = guild.get_role(constants.Roles.voice_banned)
+        if role is None:
+            return
+
+        for channel in guild.voice_channels:
+            current_perms = channel.overwrites_for(role)
+            if current_perms.connect is not False:
+                await channel.set_permissions(role, connect=False, reason="Setting up permissions for voice ban role.")
+
 
     @redis_cache.atomic_transaction
     async def _ping_newcomer(self, member: discord.Member) -> None:
