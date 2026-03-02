@@ -181,7 +181,6 @@ class VoiceGate(Cog):
             if current_perms.connect is not False:
                 await channel.set_permissions(role, connect=False, reason="Setting up permissions for voice ban role.")
 
-
     @redis_cache.atomic_transaction
     async def _ping_newcomer(self, member: discord.Member) -> None:
         """See if `member` should be sent a voice verification notification, and send it if so."""
