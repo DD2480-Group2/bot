@@ -110,7 +110,7 @@ testlog after: ```testlog_after_voiceban.txt``` in root
 
 
 ## UML class diagram and its description
-
+<img width="1198" height="588" alt="image" src="https://github.com/user-attachments/assets/7561e583-b732-4555-b76a-a203c89a7d46" />
 
 ### Key changes/classes affected
 The key changes that have been made are in the Infractions class, where functionality was expanded by implementing the voiceban function, and all functions that relate to it. This means adding unvoiceban, appply_voice_ban (which follows the architecture of how they implement commands), pardon_voice_ban and _pardon_action (which also follow how the architecture wants the structure of the code to be.
@@ -136,6 +136,7 @@ The main problem that this system seeks to address seems to be scaling and consi
 ### Architecture of the system
 The overarching architecture of the system is detailed in the following diagram.
 
+<img width="1418" height="394" alt="image" src="https://github.com/user-attachments/assets/6338a439-5ae0-4c39-9604-0a3f8f036c6a" />
 
 The communication between Discord and the bot is event-driven. When the program starts, its main entry is the main.py. It configures all of the necessary services, i.e., HTTP session, redis, API client etc. The Discord bot registers itself to the server (discord channel) and receives events via the Discord API. As events are dispatched by the Discord library, the implemented event listeners (on a specific command) in bot’s extensions (see diagram) are called and perform their given command logic. Some of these command handlers may in turn dispatch Actions, for example when banning a user, or removing them from the voice channel.
 
