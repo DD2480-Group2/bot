@@ -190,7 +190,6 @@ class VoiceBanTests(unittest.IsolatedAsyncioTestCase):
         self.ctx.send = AsyncMock()
         self.cog.apply_infraction = AsyncMock()
 
-
         self.ctx.author = self.mod
         self.mod.roles = [MockRole(id=91212399, position=100)]
         self.mod.top_role = self.mod.roles[0]
@@ -201,7 +200,6 @@ class VoiceBanTests(unittest.IsolatedAsyncioTestCase):
         self.ctx.me.roles = [MockRole(id=24221322, position=10)]
         self.ctx.me.top_role = self.ctx.me.roles[0]
 
-
         self.assertGreaterEqual(self.user.top_role.position, self.ctx.me.top_role.position)
 
         await self.cog.apply_voice_ban(self.ctx, self.user, "foobar")
@@ -210,7 +208,6 @@ class VoiceBanTests(unittest.IsolatedAsyncioTestCase):
             ":x: I can't voice ban users above or equal to me in the role hierarchy."
         )
         self.cog.apply_infraction.assert_not_awaited()
-
 
     @patch("bot.exts.moderation.infraction.infractions._utils.post_infraction")
     @patch("bot.exts.moderation.infraction.infractions._utils.get_active_infraction")
@@ -386,7 +383,6 @@ class VoiceBanTests(unittest.IsolatedAsyncioTestCase):
 
         self.user.move_to.assert_not_awaited()
         self.user.add_roles.assert_awaited_once_with(role, reason=reason)
-
 
 @patch("bot.exts.moderation.infraction.infractions.constants.Roles.voice_verified", new=123456)
 class VoiceMuteTests(unittest.IsolatedAsyncioTestCase):
