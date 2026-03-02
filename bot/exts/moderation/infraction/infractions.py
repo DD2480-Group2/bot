@@ -160,15 +160,21 @@ class Infractions(InfractionScheduler, commands.Cog):
         await self.cleanban(ctx, user, duration=(arrow.utcnow() + COMP_BAN_DURATION).datetime, reason=COMP_BAN_REASON)
 
     @command(aliases=("vban",))
-    async def voiceban(self, ctx: Context) -> None:
+    @ensure_future_timestamp(timestamp_arg=3)
+    async def voiceban(
+            self,
+            ctx: Context,
+            user: UnambiguousMemberOrUser,
+            duration: DurationOrExpiry | None = None,
+            *,
+            reason: str | None = None
+    ) -> None:
         """
-        NOT IMPLEMENTED.
-
-        Permanently ban a user from joining voice channels.
+        Ban a user from entering any voice channel.
 
         If duration is specified, it temporarily voice bans that user for the given duration.
         """
-        await ctx.send(":x: This command is not yet implemented. Maybe you meant to use `voicemute`?")
+        await self.apply_voice_ban(ctx, user, reason, duration_or_expiry=duration)
 
     @command(aliases=("vmute",))
     @ensure_future_timestamp(timestamp_arg=3)
@@ -359,13 +365,15 @@ class Infractions(InfractionScheduler, commands.Cog):
         await self.pardon_infraction(ctx, "ban", user, pardon_reason)
 
     @command(aliases=("uvban",))
-    async def unvoiceban(self, ctx: Context) -> None:
-        """
-        NOT IMPLEMENTED.
-
-        Temporarily voice bans that user for the given duration.
-        """
-        await ctx.send(":x: This command is not yet implemented. Maybe you meant to use `unvoicemute`?")
+    async def unvoiceban(
+            self,
+            ctx: Context,
+            user: UnambiguousMemberOrUser,
+            *,
+            pardon_reason: str | None = None
+    ) -> None:
+        """Prematurely end the active voice ban infraction for the user."""
+        await self.pardon_infraction(ctx, "voice_ban", user, pardon_reason)
 
     @command(aliases=("uvmute",))
     async def unvoicemute(
@@ -512,6 +520,34 @@ class Infractions(InfractionScheduler, commands.Cog):
         return infraction
 
     @respect_role_hierarchy(member_arg=2)
+    async def apply_voice_ban(
+            self,
+            ctx: Context,
+            user: Member,
+            reason: str | None,
+            **kwargs
+    ) -> None:
+        """Apply a voice ban infraction with kwargs passed to `post_infraction`."""
+        if await _utils.get_active_infraction(ctx, user, "voice_ban"):
+            return
+
+        infraction = await _utils.post_infraction(ctx, user, "voice_ban", reason, active=True, **kwargs)
+        if infraction is None:
+            return
+
+        if user.top_role >= ctx.me.top_role:
+            await ctx.send(":x: I can't voice ban users above or equal to me in the role hierarchy.")
+            return
+
+        role = ctx.guild.get_role(constants.Roles.voice_banned)
+        async def action() -> None:
+            if user.voice and user.voice.channel:
+                await user.move_to(None, reason="Disconnected from voice to apply voice ban.")
+            await user.add_roles(role, reason=reason)
+
+        await self.apply_infraction(ctx, infraction, user, action)
+
+    @respect_role_hierarchy(member_arg=2)
     async def apply_voice_mute(self, ctx: Context, user: MemberOrUser, reason: str | None, **kwargs) -> None:
         """Apply a voice mute infraction with kwargs passed to `post_infraction`."""
         if await _utils.get_active_infraction(ctx, user, "voice_mute"):
@@ -618,6 +654,39 @@ class Infractions(InfractionScheduler, commands.Cog):
 
         return log_text
 
+    async def pardon_voice_ban(
+            self,
+            user_id: int,
+            guild: discord.Guild,
+            reason: str | None,
+            *,
+            notify: bool = True
+    ) -> dict[str, str]:
+        """Remove a user's voice ban, optionally DM them a notification, and return a log dict."""
+        user = await get_or_fetch_member(guild, user_id)
+        log_text = {}
+
+        role = guild.get_role(constants.Roles.voice_banned)
+        if user:
+            new_reason = reason or "Voice ban expired"
+            await user.remove_roles(role, reason=new_reason)
+
+            if notify:
+                # DM the user about the expiration.
+                notified = await _utils.notify_pardon(
+                    user=user,
+                    title="Your voice ban has ended",
+                    content="You may now join VC if you are voice-verified.",
+                    icon_url=_utils.INFRACTION_ICONS["voice_ban"][1]
+                )
+                log_text["DM"] = "Sent" if notified else "**Failed**"
+
+            log_text["Member"] = format_user(user)
+        else:
+            log.info(f"Failed to remove voice ban from user {user_id}: user not found")
+            log_text["Failure"] = "User was not found in the guild."
+        return log_text
+
     async def _pardon_action(self, infraction: _utils.Infraction, notify: bool) -> dict[str, str] | None:
         """
         Execute deactivation steps specific to the infraction's type and return a log dict.
@@ -635,6 +704,8 @@ class Infractions(InfractionScheduler, commands.Cog):
             return await self.pardon_ban(user_id, guild, reason)
         if infraction["type"] == "voice_mute":
             return await self.pardon_voice_mute(user_id, guild, notify=notify)
+        if infraction["type"] == "voice_ban":
+            return await self.pardon_voice_ban(user_id, guild, reason, notify=notify)
         return None
 
     # endregion

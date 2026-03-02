@@ -5,9 +5,9 @@ import discord
 from async_rediscache import RedisCache
 from discord import Colour, Member, TextChannel, VoiceState
 from discord.ext.commands import Cog, Context, command, has_any_role
-from pydis_core.site_api import ResponseCodeError
 from pydis_core.utils.channel import get_or_fetch_channel
 
+from bot import constants
 from bot.bot import Bot
 from bot.constants import Channels, Icons, MODERATION_ROLES, Roles, VoiceGate as GateConf
 from bot.log import get_logger
@@ -60,34 +60,18 @@ class VoiceVerificationView(discord.ui.View):
             )
             return
 
-        try:
-            data = await self.bot.api_client.get(
-                f"bot/users/{interaction.user.id}/metricity_data",
-                raise_for_status=True
+        if interaction.user.get_role(Roles.voice_banned):
+            await interaction.response.send_message(
+                "You are currently voice banned and cannot be voice verified.",
+                ephemeral=True,
+                delete_after=GateConf.delete_after_delay,
             )
-        except ResponseCodeError as err:
-            if err.response.status == 404:
-                await interaction.response.send_message((
-                    "We were unable to find user data for you. "
-                    "Please try again shortly. "
-                    "If this problem persists, please contact the server staff through ModMail."),
-                    ephemeral=True,
-                    delete_after=GateConf.delete_after_delay,
-                )
-                log.info("Unable to find Metricity data about %s (%s)", interaction.user, interaction.user.id)
-            else:
-                await interaction.response.send_message((
-                    "We encountered an error while attempting to find data for your user. "
-                    "Please try again and let us know if the problem persists."),
-                    ephemeral=True,
-                    delete_after=GateConf.delete_after_delay,
-                )
-                log.warning(
-                    "Got response code %s while trying to get %s Metricity data.",
-                    err.status,
-                    interaction.user.id
-                )
             return
+
+        data = {
+            "voice_gate_blocked": False,
+            "activity_blocks": GateConf.minimum_activity_blocks
+        }
 
         checks = {
             "joined_at": (
@@ -178,6 +162,24 @@ class VoiceGate(Cog):
     async def cog_load(self) -> None:
         """Adds verify button to be monitored by the bot."""
         self.bot.add_view(VoiceVerificationView(self.bot))
+        self.bot.loop.create_task(self.setup_voice_permissions())
+
+    async def setup_voice_permissions(self) -> None:
+        """Loops through all channels and limit role voice_ban to join any chanel."""
+        await self.bot.wait_until_ready()
+
+        guild = self.bot.get_guild(constants.Guild.id)
+        if guild is None:
+            return
+
+        role = guild.get_role(constants.Roles.voice_banned)
+        if role is None:
+            return
+
+        for channel in guild.voice_channels:
+            current_perms = channel.overwrites_for(role)
+            if current_perms.connect is not False:
+                await channel.set_permissions(role, connect=False, reason="Setting up permissions for voice ban role.")
 
     @redis_cache.atomic_transaction
     async def _ping_newcomer(self, member: discord.Member) -> None:
