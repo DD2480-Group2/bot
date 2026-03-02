@@ -176,7 +176,6 @@ class Infractions(InfractionScheduler, commands.Cog):
         """
         await self.apply_voice_ban(ctx, user, reason, duration_or_expiry=duration)
 
-
     @command(aliases=("vmute",))
     @ensure_future_timestamp(timestamp_arg=3)
     async def voicemute(
